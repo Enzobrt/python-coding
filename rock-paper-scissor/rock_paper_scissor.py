@@ -63,13 +63,3 @@ while True:
     jugar_otra_vez = input("\n¿Quieres jugar otra vez? (y/n) : ")
     if jugar_otra_vez != "y":
         break
-
-"""
-match (usuario_num - pc_num) % 3:
-    case 0:
-        print("Empate")
-    case 1:
-        print("Has ganado")
-    case -1:
-        print("Has perdido")
-"""
