@@ -4,11 +4,15 @@
 import pygame
 import numpy as np
 import math
-# import keyboard
+import random
+import json
+import os
+
+MAP_FILE = "save.json"
 
 pygame.init()
 
-SCREEN_SIZE = (800, 600)
+MAXIMIZED = False
 
 MONITOR = pygame.display.Info()
 
@@ -16,7 +20,10 @@ WIDTH = MONITOR.current_w
 HEIGHT = MONITOR.current_h
 SCREEN_SIZE = (WIDTH, HEIGHT)
 
+SCREEN_SIZE_SMALL = (800, 600)
+
 print(f"Size: {SCREEN_SIZE}")
+
 SCREEN = pygame.display.set_mode(SCREEN_SIZE)
 # Sirve para cambiarle el nombre a la ventana
 pygame.display.set_caption('Mars Mars')
@@ -29,8 +36,6 @@ font = pygame.font.SysFont("JetBrains Mono", 15)
 text_color = (255, 255, 255)  # White
 
 # Background
-background = (40, 40, 40)  # Dark gray
-
 gradient_ground_color1 = (137, 3, 1)
 gradient_ground_color2 = (142, 33, 3)
 
@@ -47,7 +52,7 @@ ground1 = pygame.Rect(ground1_pos, ground1_size)
 # kill obstacles
 kill_bottom_color = (255, 0, 0)
 
-kill_bottom_size = [SCREEN.get_rect().x, 10]
+kill_bottom_size = [SCREEN.get_rect().width, 10]
 kill_bottom_pos = [0, ground1_pos[1] + 200]
 kill_bottom = pygame.Rect(kill_bottom_pos, kill_bottom_size)
 
@@ -58,13 +63,62 @@ player_pos = [ground1.centerx, ground1.top - 10]
 player_size = [20, 20]
 player_color = (0, 0, 255)  # Blue
 
-player_jump = -12
+CHECKPOINT_OFFSET_X = 0
+CHECKPOINT_OFFSET_Y = 2
 
 gravity = 0.5
 max_gravity = 20
 
 # Camera
 scroll = [0, 0]
+
+
+def platforms_to_data(grounds):
+    return [[s.rect.x, s.rect.y, s.rect.width, s.rect.height] for s in grounds]
+
+
+def save_map(name):
+    last_platform = None
+    if player.previous_platform is not None:
+        rect = player.previous_platform.rect
+        last_platform = [rect.x, rect.y, rect.width, rect.height]
+
+    data = {
+        "platforms": platforms_to_data(ground_sprites),
+        "last_platform": last_platform,
+        "platforms_stepped": player.platforms_stepped,
+        "visited_platforms": [list(pos) for pos in player.visited_platforms],
+    }
+
+    with open(name, "w") as file:
+        json.dump(data, file, indent=2)
+
+
+def load_map(name):
+    with open(name, "r") as file:
+        data = json.load(file)
+
+    old_grounds = ground_sprites.sprites()
+    ground_sprites.empty()
+    all_sprites.remove(old_grounds)
+
+    for x, y, w, h in data["platforms"]:
+        ground = Ground(pygame.Rect(x, y, w, h))
+        ground_sprites.add(ground)
+        all_sprites.add(ground)
+
+    player.platforms_stepped = data["platforms_stepped"]
+    player.visited_platforms = {tuple(pos) for pos in data.get("visited_platforms", [])}
+
+    player.previous_platform = None
+    if data["last_platform"] is not None:
+        lx, ly, lw, lh = data["last_platform"]
+        for ground in ground_sprites:
+            if ground.rect.x == lx and ground.rect.y == ly:
+                player.previous_platform = ground
+                break
+
+    return data
 
 
 class Player(pygame.sprite.Sprite):
@@ -95,6 +149,10 @@ class Player(pygame.sprite.Sprite):
         # Physics variables
         self.vel_y = 0
         self.on_ground = True
+        self.current_platform_pos = None
+        self.previous_platform = None
+        self.platforms_stepped = 0
+        self.visited_platforms = set()
 
     def current_fuel(self):
         return self.player_fuel
@@ -102,9 +160,35 @@ class Player(pygame.sprite.Sprite):
     def current_direction(self):
         return self.direction
 
-    def respawn(self, spawn_point):
-        player.rect.x = spawn_point[0]
-        player.rect.y = spawn_point[1]
+    def current_platform(self, grounds):
+        hit = pygame.sprite.spritecollideany(player, grounds)
+        self.platform_object = hit if hit and player.vel_y >= 0 else None
+        self.current_platform_pos = self.platform_object.rect.topleft if self.platform_object else None
+        return self.platform_object
+
+    def is_new_platform(self, current, was_on_ground):
+        if current is None or was_on_ground:
+            return False
+        if current.rect.topleft in self.visited_platforms:
+            return False
+        self.visited_platforms.add(current.rect.topleft)
+        self.platforms_stepped += 1
+        return True
+
+    def checkpoint_pos(self):
+        if self.previous_platform is not None:
+            rect = self.previous_platform.rect
+            pos = [rect.x + CHECKPOINT_OFFSET_X,
+                   rect.top - self.rect.height - CHECKPOINT_OFFSET_Y]
+            if pos[1] + self.rect.height < kill_bottom.rect.top:
+                return pos
+        return list(spawn_point)
+
+    def respawn(self):
+        self.rect.x, self.rect.y = self.checkpoint_pos()
+        self.vel_y = 0
+        self.on_ground = False
+        self.player_using_jetpack = False
         # print("respawn")
 
     def ground_collision(self, grounds):
@@ -113,12 +197,12 @@ class Player(pygame.sprite.Sprite):
         if hit and player.vel_y >= 0:
             return True
 
-    def check_kill_player(self, kill_obstacles, spawn_point):
+    def check_kill_player(self, kill_obstacles):
         for kill_obstacle in kill_obstacles:
             if self.rect.bottom >= kill_obstacle.rect.top:
-                player.respawn(spawn_point)
+                self.respawn()
 
-    def update(self, keys, spawn_point, grounds):
+    def update(self, keys, grounds):
         if self.on_ground:
             self.player_movement = 8
             self.vel_y = 0
@@ -131,7 +215,7 @@ class Player(pygame.sprite.Sprite):
             self.max_gravity_force_increase = -0.4
 
         if self.player_using_jetpack or not self.on_ground:
-            self.player_movement = 3
+            self.player_movement = 4.5
 
         # Stop player when hitting ground
         hit = pygame.sprite.spritecollideany(player, grounds)
@@ -149,12 +233,6 @@ class Player(pygame.sprite.Sprite):
             self.direction = "right"
 
         # Jumping logic
-        """
-        if keys[pygame.K_UP] | keys[pygame.K_w] and self.on_ground:
-            self.vel_y = player_jump
-            self.on_ground = False
-        """
-
         if self.jetpack_force_increase >= self.max_jetpack_force_increase:
             self.jetpack_force_increase = self.max_jetpack_force_increase
 
@@ -173,7 +251,7 @@ class Player(pygame.sprite.Sprite):
             self.jetpack_force_increase = 0
 
         if self.on_ground and not self.player_using_jetpack:
-            self.player_fuel = 100000000
+            self.player_fuel = 100
 
         if 0 <= self.player_fuel <= 10:
             self.player_jetpack_force = -11
@@ -182,8 +260,6 @@ class Player(pygame.sprite.Sprite):
         # Apply gravity
         self.vel_y += gravity
         self.rect.y += self.vel_y
-
-        # print(self.vel_y)
 
         if not self.on_ground:
             self.gravity_force_increase -= 0.4
@@ -200,7 +276,7 @@ class Player(pygame.sprite.Sprite):
         if self.vel_y == max_gravity and self.player_fuel <= 0 and player.ground_collision(grounds):
             self.on_ground = False
             self.vel_y = 0
-            player.respawn(spawn_point)
+            self.respawn()
 
 
 class Ground(pygame.sprite.Sprite):
@@ -241,6 +317,44 @@ def draw_mountains(surface, scroll_x, ground_y, color, base_h):
             [(x, ground_y), (x + spacing // 2, ground_y - h), (x + spacing, ground_y)])
 
 
+def generate_platforms(current_platform, color, size):
+    if SCREEN.get_height() <= 800:
+        platform_x_range = (250, SCREEN.get_height() - 200)
+    else:
+        platform_x_range = (300, SCREEN.get_height() // 2)
+
+    if player.rect.y >= 350:
+        platform_y_range = (0, 150)
+    elif player.rect.y <= -100:
+        platform_y_range = (-150, 0)
+    else:
+        platform_y_range = (-150, 100)
+    spacing = (random.randint(platform_x_range[0], platform_x_range[1]), random.randint(platform_y_range[0], platform_y_range[1]))
+    platform = pygame.Rect((current_platform.rect.x + spacing[0], current_platform.rect.y - spacing[1]), size)
+    ground = Ground(platform)
+    ground_sprites.add(ground)
+    all_sprites.add(ground)
+
+
+def start_new_game():
+    old_grounds = ground_sprites.sprites()
+    ground_sprites.empty()
+    all_sprites.remove(old_grounds)
+
+    first_ground = Ground(pygame.Rect(ground1_pos, ground1_size))
+    ground_sprites.add(first_ground)
+    all_sprites.add(first_ground)
+
+    player.previous_platform = first_ground
+    player.platforms_stepped = 1
+    player.visited_platforms = {first_ground.rect.topleft}
+    player.player_fuel = 100
+    player.respawn()
+
+    generate_platforms(first_ground, ground_color, ground1_size)
+    return first_ground
+
+
 player = Player()
 
 ground1 = Ground(ground1)
@@ -253,6 +367,13 @@ player_sprite = pygame.sprite.Group(player)
 
 all_sprites = pygame.sprite.Group(ground_sprites, kill_obstacles, player_sprite)
 
+if os.path.exists(MAP_FILE):
+    load_map(MAP_FILE)
+else:
+    start_new_game()
+
+player.respawn()
+
 # Set up the clock
 clock = pygame.time.Clock()
 FPS = 60
@@ -261,7 +382,6 @@ FPS = 60
 running = True
 while running:
     dt = clock.tick(FPS) / 1000.0
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -269,21 +389,40 @@ while running:
             if event.key == pygame.K_ESCAPE:
                 running = False
 
+            elif event.key == pygame.K_f:
+                MAXIMIZED = not MAXIMIZED
+                pygame.display.set_mode(SCREEN_SIZE if MAXIMIZED else SCREEN_SIZE_SMALL, pygame.RESIZABLE)
+                screen_middle_x = SCREEN.get_rect().centerx
+                screen_middle_y = SCREEN.get_rect().centery
+
+            elif event.key == pygame.K_p:
+                if os.path.exists(MAP_FILE):
+                    os.remove(MAP_FILE)
+                start_new_game()
+
+        elif event.type == pygame.VIDEORESIZE:
+            # Recreate surface with new dimensions
+            SCREEN = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+
     keys = pygame.key.get_pressed()
 
     # Player functions
-    scroll[0] = player.rect.centerx - screen_middle_x
+    scroll[0] = player.rect.centerx - screen_middle_x + 300
     scroll[1] = player.rect.centery - screen_middle_y
 
-    player.update(keys, spawn_point, ground_sprites)
-    player.check_kill_player(kill_obstacles, spawn_point)
+    was_on_ground = player.on_ground
+    player.update(keys, ground_sprites)
+    player.check_kill_player(kill_obstacles)
 
-    # Clamp to edge
-    """
-    clamp_rect = pygame.Rect(
-        0, -10000, SCREEN.get_width(), SCREEN.get_height() + 10000)
-    player.rect.clamp_ip(clamp_rect)
-    """
+    kill_bottom.rect.centerx = player.rect.centerx + 300 + 300
+
+
+    current = player.current_platform(ground_sprites)
+    if player.is_new_platform(current, was_on_ground):
+        print("Nueva plataforma:", current.rect.topleft)
+        generate_platforms(current, ground_color, ground1_size)
+    if current is not None:
+        player.previous_platform = current
 
     # Background color
     SCREEN.fill(gradient_sky_color1)
@@ -298,6 +437,12 @@ while running:
     # Ground gradient
     draw_gradient_rect(SCREEN, pygame.Rect(screen_middle_x - SCREEN.get_width() // 2, ground1_pos[1] - scroll[1], SCREEN.get_width(), SCREEN.get_height()), gradient_ground_color1, gradient_ground_color2)
 
+    # Player position text
+    player_pos = (player.rect.x, player.rect.y)
+    player_position_text = font.render(str(player_pos), True, text_color)
+    player_position_text_pos = (20, 70)
+    SCREEN.blit(player_position_text, player_position_text_pos)
+
     # Draw text
     facing_text = font.render(str(player.current_direction()), True, text_color)
     facing_text_pos = (20, 10)
@@ -307,10 +452,17 @@ while running:
     fuel_text_pos = (20, 40)
     SCREEN.blit(fuel_text, fuel_text_pos)
 
+    platforms_text = font.render(str(player.platforms_stepped), True, text_color)
+    platforms_text_pos = (20, 100)
+    SCREEN.blit(platforms_text, platforms_text_pos)
+
     # Draw sprites
     for sprite in all_sprites:
         SCREEN.blit(sprite.image, (sprite.rect.x - scroll[0], sprite.rect.y - scroll[1]))
 
     pygame.display.flip()
+
+
+save_map(MAP_FILE)
 
 pygame.quit()
