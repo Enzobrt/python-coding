@@ -3,8 +3,11 @@ import socket
 
 pygame.init()
 
-SCREEN_SIZE = (800, 800)
+SCREEN_SIZE = (800, 600)
 SCREEN = pygame.display.set_mode(SCREEN_SIZE)
+
+SCREEN_CENTERX, SCREEN_CENTERY = SCREEN.get_width() / 2, SCREEN.get_height() / 2
+
 pygame.display.set_caption("Multiplayer test")
 
 BACKGROUND_COLOR = (255, 255, 255)
@@ -12,20 +15,17 @@ BACKGROUND_COLOR = (255, 255, 255)
 MOUSE_POS = pygame.mouse.get_pos()
 
 
+def draw_rect(surface, color, rect):
+    pygame.draw.rect(surface, color, rect)
+
+
+def draw_grid():
+    pass
+
+
 class tic_tac_toc:
     def __init__(self):
-        self.draw_grid()
-
-    def draw_rect(surface, pos, size, color):
-        pygame.draw.rect(surface, color, pygame.Rect(pos, size))
-
-    def draw_grid(self):
-        rect_size = (20, 20)
-        rect_color = (0, 0, 0)
-        border_spacing_x, border_spacing_y = SCREEN.get_width() / 5, SCREEN.get_height() / 5
-
-        rect_pos = (SCREEN.get_width() - SCREEN.get_rect().centerx, SCREEN.get_height() - SCREEN.get_rect().centery)
-        self.draw_rect(SCREEN, rect_pos, rect_size, rect_color)
+        draw_grid()
 
 
 tic_tac_toc = tic_tac_toc()
@@ -46,6 +46,9 @@ while running:
     MOUSE_POS = pygame.mouse.get_pos()
 
     SCREEN.fill(BACKGROUND_COLOR)
+
+    draw_grid()
+
     pygame.display.flip()
 
 pygame.quit()

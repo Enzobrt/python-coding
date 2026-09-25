@@ -381,7 +381,7 @@ FPS = 60
 # Set the game loop
 running = True
 while running:
-    dt = clock.tick(FPS) / 1000.0
+    # dt = clock.tick(FPS) / 1000.0
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -461,7 +461,7 @@ while running:
         SCREEN.blit(sprite.image, (sprite.rect.x - scroll[0], sprite.rect.y - scroll[1]))
 
     pygame.display.flip()
-
+    clock.tick(FPS)
 
 save_map(MAP_FILE)
 
