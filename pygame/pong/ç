@@ -1,0 +1,49 @@
+import pygame
+import random
+
+import objects
+import options
+
+pygame.init()
+
+background_color = (30, 30, 30)
+
+
+def start_round(ball):
+    ball.position = [options.DISPLAY.get_rect(
+    ).centerx, options.DISPLAY.get_rect().centery]
+    speed_range = random.randint(10, 30)
+    ball.speed_vector = [speed_range, speed_range]
+
+
+round = 0
+
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                running = False
+            if event.key == pygame.K_f:
+                round += 1
+                print("round")
+
+    if round <= 0:
+        start_round(objects.ball)
+        print("ball")
+
+    keys = pygame.key.get_pressed()
+
+    options.DISPLAY.fill(background_color)
+    objects.padel_l.update(
+        keys[pygame.K_w], keys[pygame.K_s], options.DISPLAY, options.DELTATIME)
+    objects.padel_r.update(
+        keys[pygame.K_UP], keys[pygame.K_DOWN], options.DISPLAY, options.DELTATIME)
+    objects.ball.update(options.DISPLAY, options.DELTATIME)
+
+    pygame.display.flip()
+    options.clock.tick(options.FPS)
+
+pygame.quit()
