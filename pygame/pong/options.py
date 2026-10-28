@@ -5,5 +5,5 @@ DISPLAY = pygame.display.set_mode(SCREEN_SIZE, pygame.NOFRAME)
 
 clock = pygame.time.Clock()
 
-FPS = 20
+FPS = 90
 DELTATIME = clock.tick(FPS)/1000
