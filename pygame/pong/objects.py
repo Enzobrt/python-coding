@@ -69,7 +69,8 @@ class PadelAI():
         pygame.draw.rect(screen, self.color, self.rect)
 
 
-padel_ai = PadelAI([options.DISPLAY.get_rect().right - padel_l.size[0] * 2, options.DISPLAY.get_rect().centery])
+padel_ai = PadelAI([options.DISPLAY.get_rect().right -
+                   padel_l.size[0] * 2, options.DISPLAY.get_rect().centery])
 
 
 class Ball():
@@ -86,6 +87,10 @@ class Ball():
 
         self.hit_goal = False
 
+    def increment_speed(self):
+        self.speed_vector[0] += self.speed_increment
+        self.speed_vector[1] += self.speed_increment
+
     def bounce_screen(self, screen):
         # x
         if self.position[0] <= 0 or self.position[0] + self.size[0] >= screen.width:
@@ -99,8 +104,7 @@ class Ball():
 
         # y
         if self.position[1] <= 0 or self.position[1] + self.size[1] >= screen.height:
-            self.speed_vector[0] += self.speed_increment
-            self.speed_vector[1] += self.speed_increment
+            self.increment_speed()
 
             self.speed_vector[1] *= -1
 
@@ -114,11 +118,9 @@ class Ball():
 
     def bounce_padel(self, padel):
         if self.rect.colliderect(padel):
-            self.speed_vector[0] += self.speed_increment
-            self.speed_vector[1] += self.speed_increment
+            self.increment_speed()
 
             self.speed_vector[0] *= -1
-
 
     def start_new_round(self, delta, round):
         self.position = [options.DISPLAY.get_rect(
