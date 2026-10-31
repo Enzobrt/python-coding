@@ -1,6 +1,7 @@
 import pygame
 import random
 import numpy as np
+import time
 
 import options
 
@@ -12,7 +13,7 @@ def lerp(a, b, t):
 class Padel():
     def __init__(self, position):
         self.size = (20, 100)
-        self.color = (255, 255, 255)
+        self.color = (0, 180, 235)
         self.position = position
         self.position[1] = self.position[1] - self.size[1] / 2
 
@@ -38,15 +39,15 @@ class Padel():
         pygame.draw.rect(screen, self.color, self.rect)
 
 
-padel_l = Padel([options.DISPLAY.get_rect().left + 20,
+padel_l = Padel([options.DISPLAY.get_rect().left + 5,
                 options.DISPLAY.get_rect().centery])
-# padel_r = Padel([options.DISPLAY.get_rect().right - padel_l.size[0], options.DISPLAY.get_rect().centery])
+# padel_r = Padel([options.DISPLAY.get_rect().right - padel_l.size[0] - 5, options.DISPLAY.get_rect().centery])
 
 
 class PadelAI():
     def __init__(self, position):
         self.size = (20, 100)
-        self.color = (255, 255, 255)
+        self.color = (0, 180, 235)
         self.position = position
         self.position[1] = self.position[1] - self.size[1] / 2
 
@@ -70,7 +71,7 @@ class PadelAI():
 
 
 padel_ai = PadelAI([options.DISPLAY.get_rect().right -
-                   padel_l.size[0] * 2, options.DISPLAY.get_rect().centery])
+                   padel_l.size[0] - 5, options.DISPLAY.get_rect().centery])
 
 
 class Ball():
@@ -87,15 +88,21 @@ class Ball():
 
         self.hit_goal = False
 
+        self.point_l = 0
+        self.point_r = 0
+
     def increment_speed(self):
         self.speed_vector[0] += self.speed_increment
         self.speed_vector[1] += self.speed_increment
 
     def bounce_screen(self, screen):
         # x
-        if self.position[0] <= 0 or self.position[0] + self.size[0] >= screen.width:
-            # self.speed_vector[0] *= -1
+        if self.position[0] <= 0:
             self.hit_goal = True
+            self.point_r += 1
+        if self.position[0] + self.size[0] >= screen.width:
+            self.hit_goal = True
+            self.point_l += 1
 
             if self.position[0] <= 0:
                 self.position[0] = 0
@@ -109,7 +116,6 @@ class Ball():
             self.speed_vector[1] *= -1
 
             self.bounces += 1
-            print(self.bounces)
 
             if self.position[1] <= 0:
                 self.position[1] = 0
@@ -121,12 +127,26 @@ class Ball():
             self.increment_speed()
 
             self.speed_vector[0] *= -1
+            if self.speed_vector[0] >= 0:
+                self.position[0] += 5
+            else:
+                self.position[0] -= 5
 
     def start_new_round(self, delta, round):
         self.position = [options.DISPLAY.get_rect(
         ).centerx, options.DISPLAY.get_rect().centery]
 
-        ball_angle = random.uniform(0, 2 * np.pi)
+        time.sleep(0.1)
+
+        side = random.choice([-1, 1])
+        # ball_angle = random.uniform(0, 2 * np.pi)
+        if side >= 0:
+            ball_angle = random.uniform(-1, 1) * 0.1
+        else:
+            ball_angle = random.uniform(179, 181) * 0.1
+
+        ball_angle = 45 * 0.001
+        print(ball_angle)
 
         ball_vx = np.cos(ball_angle) * self.initial_speed
         ball_vy = np.sin(ball_angle) * self.initial_speed
