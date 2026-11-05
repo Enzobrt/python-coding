@@ -5,7 +5,7 @@ DISPLAY_NATIVE_SIZE = (100, 100)
 MONITOR_INFO = pygame.display.Info()
 MONITOR_SIZE = (MONITOR_INFO.current_w, MONITOR_INFO.current_h)
 
-DISPLAY_NATIVE = pygame.display.set_mode(DISPLAY_NATIVE_SIZE, pygame.HIDDEN)
+DISPLAY_NATIVE = pygame.Surface(DISPLAY_NATIVE_SIZE)
 MONITOR = pygame.display.set_mode(MONITOR_SIZE, pygame.NOFRAME)
 
 FPS = 60
@@ -29,10 +29,17 @@ while running:
                 running = False
 
     left, middle, right = pygame.mouse.get_pressed()
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+
     if left:
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        print(f"Clicked at: {mouse_x}, {mouse_y}")
-        DISPLAY_NATIVE.set_at((mouse_x, mouse_y), alive_color)
+        # print(f"Clicked at: {mouse_x}, {mouse_y}")
+        # DISPLAY_NATIVE.set_at((mouse_x, mouse_y), alive_color)
+
+        native_x = int(mouse_x * DISPLAY_NATIVE_SIZE[0] / MONITOR_SIZE[0])
+        native_y = int(mouse_y * DISPLAY_NATIVE_SIZE[1] / MONITOR_SIZE[1])
+
+        if 0 <= native_x < 100 and 0 <= native_y < 100:
+            DISPLAY_NATIVE.set_at((native_x, native_y), alive_color)
 
     # Upscale screen
     scaled_surface = pygame.transform.scale(DISPLAY_NATIVE, MONITOR_SIZE)

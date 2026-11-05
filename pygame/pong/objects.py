@@ -145,7 +145,6 @@ class Ball():
         else:
             ball_angle = random.uniform(179, 181) * 0.1
 
-        ball_angle = 45 * 0.001
         print(ball_angle)
 
         ball_vx = np.cos(ball_angle) * self.initial_speed
